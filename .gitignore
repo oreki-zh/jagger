@@ -6,3 +6,4 @@ tests/artifacts/
 output/
 gif-example.GIF
 logo-usedforgeneration.png
+.vercel/

@@ -25,6 +25,8 @@ npm start
 
 仓库：[oreki-zh/jagger](https://github.com/oreki-zh/jagger)。`.github/workflows/pages.yml` 通过 GitHub Actions 将 `site/` 目录发布到 GitHub Pages；推送到 `main` 的网站变更会触发部署。也可直接把 `site/` 作为任意静态托管的发布目录。所有页面资源均为相对路径，适用于仓库子路径。
 
+Vercel 导入仓库时使用仓库根目录。`vercel.json` 将框架设为 Other，跳过安装与构建，直接发布 `site/`。渲染工具和本地开发服务器不会作为线上服务运行。
+
 ## 帧率说明
 
 每个 MP4 都有 270 帧，精确 60 fps，时长 4.5 秒。

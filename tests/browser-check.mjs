@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { mkdir, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}) });
@@ -14,8 +15,12 @@ await page.goto(baseURL, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);
 assert.equal(await page.locator('.style-card').count(), 9);
 const assets = await page.evaluate(() => window.MOTION_COLLECTION.styles.flatMap(s => [s.video, s.gif, s.compatibleGif, s.poster]));
+const source = await page.evaluate(() => ({ version: window.MOTION_COLLECTION.assetVersion, sha: window.MOTION_COLLECTION.sha256 }));
+assert.equal(source.version, source.sha.slice(0, 12));
+const svgResponse = await page.request.get(new URL(`assets/logo.svg?v=${source.version}`, baseURL).href);
+assert.equal(createHash('sha256').update(await svgResponse.body()).digest('hex'), source.sha, 'Downloaded SVG matches the rendered source');
 for (const asset of assets) {
-  const response = await page.request.head(new URL(asset, baseURL).href);
+  const response = await page.request.head(new URL(`${asset}?v=${source.version}`, baseURL).href);
   assert.equal(response.status(), 200, asset);
 }
 for (const id of ['ribbon', 'pages', 'cascade', 'orbit', 'slices', 'ink', 'mosaic', 'shutter', 'focus']) {
@@ -26,6 +31,7 @@ for (const id of ['ribbon', 'pages', 'cascade', 'orbit', 'slices', 'ink', 'mosai
   }, id);
   assert.equal(await page.locator(`[data-id="${id}"]`).getAttribute('aria-pressed'), 'true');
   assert.equal(await page.locator('#main-video').evaluate(v => v.duration), 4.5);
+  assert.equal(await page.locator('#main-video').evaluate(v => new URL(v.currentSrc).searchParams.get('v')), source.version);
 }
 await page.locator('[data-id="ribbon"]').click();
 await page.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);

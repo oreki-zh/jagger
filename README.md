@@ -1,6 +1,6 @@
 # Animation Display
 
-中国财富出版社 Logo 动效选集。九种动画均使用 `svg_version.svg`，统一 1080 × 320、4.5 秒、60 fps 视频母版。
+中国财富出版社 Logo 动效选集。九种动画均使用最新的 `high-resolution-reference.svg`（3551 × 427），统一输出 1080 × 320、4.5 秒、60 fps 视频母版。旧 `svg_version.svg` 保留作历史素材。
 
 [打开动画展示网站](https://oreki-zh.github.io/jagger/)
 
@@ -45,7 +45,7 @@ npm install
 GIF_SKILL_PATH="$HOME/.agents/skills/slack-gif-creator" SHARP_MODULE="$PWD/node_modules/sharp" .venv/bin/python scripts/render_collection.py
 ```
 
-系统需有 Node.js 20+、Python 3.12+ 与 FFmpeg。渲染脚本可通过 `GIF_SKILL_PATH` 和 `SHARP_MODULE` 配置依赖路径；页面预览与部署不需要这些渲染依赖。已有完整素材后，可传入 `--styles ink mosaic shutter focus` 仅重新渲染指定风格，保留其余素材并更新清单与下载包。
+系统需有 Node.js 20+、Python 3.12+ 与 FFmpeg。渲染脚本可通过 `GIF_SKILL_PATH` 和 `SHARP_MODULE` 配置依赖路径；页面预览与部署不需要这些渲染依赖。已有完整素材且源 SVG 未变化时，可传入 `--styles ink mosaic shutter focus` 仅重新渲染指定风格；替换源 SVG 后必须重新生成全部九款。脚本同步更新网站 SVG、预览图、清单与下载包，并由素材哈希标记缓存版本。
 
 缓动与 GIF 工具来自 [Anthropic slack-gif-creator](https://github.com/anthropics/skills/tree/main/skills/slack-gif-creator)。为了保留 4.5 秒时长，导出代码在该 skill 的帧合成和全局调色板功能之外，增加了 GIF 百分之一秒时序适配。
 

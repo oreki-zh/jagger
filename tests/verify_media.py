@@ -7,6 +7,8 @@ ROOT=Path(__file__).resolve().parents[1]
 data=json.loads((ROOT/'site/manifest.json').read_text())
 assert len(data['styles'])==9
 assert data['sha256']==hashlib.sha256((ROOT/data['source']).read_bytes()).hexdigest()
+assert (ROOT/'site/assets/logo.svg').read_bytes()==(ROOT/data['source']).read_bytes()
+assert data['assetVersion']==data['sha256'][:12]
 expected=set()
 for style in data['styles']:
     info=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=r_frame_rate,nb_frames,duration,width,height','-of','json',str(ROOT/'site'/style['video'])]))['streams'][0]
@@ -33,4 +35,5 @@ with zipfile.ZipFile(ROOT/'site/media/motion-collection.zip') as archive:
     assert archive.testzip() is None
     assert expected.issubset(set(archive.namelist()))
     assert len(expected)==27
+    assert archive.read('logo.svg')==(ROOT/data['source']).read_bytes()
 print('Verified all 27 animated assets and archive integrity.')

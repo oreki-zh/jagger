@@ -5,7 +5,7 @@ centisecond rounding (20/10/20 ms) instead of truncating every 16.67 ms frame.
 A separately sampled 50 fps GIF is included for browser timing compatibility.
 """
 from pathlib import Path
-import os, sys, json, math, subprocess, hashlib, zipfile, gc, argparse
+import os, sys, json, math, subprocess, hashlib, zipfile, gc, argparse, xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
@@ -21,11 +21,12 @@ OUT.mkdir(parents=True, exist_ok=True)
 FPS, SECONDS, S = 60, 4.5, 2
 W, H = 1080, 320
 SIZE = (W*S, H*S)
-SOURCE = ROOT/'svg_version.svg'
+SOURCE = ROOT/'high-resolution-reference.svg'
+SOURCE_SHA = hashlib.sha256(SOURCE.read_bytes()).hexdigest()
+viewbox = [float(v) for v in ET.parse(SOURCE).getroot().attrib['viewBox'].split()]
 SHARP = os.environ.get('SHARP_MODULE', 'sharp')
-subprocess.run(['node', '-e', f"require({json.dumps(SHARP)})({json.dumps(str(SOURCE))},{{density:216}}).flatten({{background:'#fff'}}).png().toFile({json.dumps(str(OUT/'source.png'))})"], check=True)
+subprocess.run(['node', '-e', f"require({json.dumps(SHARP)})({json.dumps(str(SOURCE))},{{density:144}}).resize({{width:{900*S},height:{round(900*viewbox[3]/viewbox[2])*S},fit:'fill'}}).flatten({{background:'#fff'}}).png().toFile({json.dumps(str(OUT/'source.png'))})"], check=True)
 logo = Image.open(OUT/'source.png').convert('RGB')
-logo = logo.resize((900*S, round(900*126/1048)*S), Image.Resampling.LANCZOS)
 LW, LH = logo.size
 LX, LY = 90*S, (H*S-LH)//2
 WHITE = Image.new('RGB', SIZE, 'white')
@@ -234,6 +235,10 @@ def gif_save(frames,path,durations):
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--styles',nargs='+',choices=list(RENDERERS),help='Render only these styles, preserving existing files for the others.')
 args=parser.parse_args()
+if args.styles:
+    previous=json.loads((ROOT/'site/manifest.json').read_text())
+    if previous.get('sha256')!=SOURCE_SHA:
+        raise ValueError('The source SVG changed. Render all styles to avoid mixing old and new artwork.')
 manifest=[]
 for style in STYLES:
     key=style['id']
@@ -262,7 +267,8 @@ for style in STYLES:
 
 STATIC.resize((W,H),Image.Resampling.LANCZOS).save(OUT/'still.png')
 (OUT/'source.png').unlink()
-metadata=dict(source='svg_version.svg',sha256=hashlib.sha256(SOURCE.read_bytes()).hexdigest(),duration=SECONDS,masterFps=FPS,gifTiming='Alternating 10/20 ms, nominal average 60 fps; browser delays may vary.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',styles=manifest)
+metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12],duration=SECONDS,masterFps=FPS,gifTiming='Alternating 10/20 ms, nominal average 60 fps; browser delays may vary.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',styles=manifest)
+(ROOT/'site/assets/logo.svg').write_bytes(SOURCE.read_bytes())
 (ROOT/'site/manifest.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2))
 (ROOT/'site/manifest.js').write_text('window.MOTION_COLLECTION = '+json.dumps(metadata,ensure_ascii=False)+';\n')
 with zipfile.ZipFile(OUT/'motion-collection.zip','w',zipfile.ZIP_DEFLATED) as archive:

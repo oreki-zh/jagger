@@ -4,11 +4,15 @@
   if (!collection?.styles?.length) return;
   const $ = id => document.getElementById(id);
   const styles = collection.styles;
+  const assetUrl = path => `${path}?v=${encodeURIComponent(collection.assetVersion || collection.sha256.slice(0, 12))}`;
+  document.querySelector('.archive-link').href = assetUrl('media/motion-collection.zip');
+  document.querySelector('footer a[download]').href = assetUrl('assets/logo.svg');
   const total = String(styles.length).padStart(2, '0');
   $('edition-count').textContent = total;
   $('edition-caption').textContent = `${styles.length} 种风格 · 每段 ${collection.duration} 秒`;
   $('collection-count').textContent = `01 — ${total}`;
   const video = $('main-video');
+  video.poster = assetUrl('media/still.png');
   const gif = $('gif-preview');
   const timeline = $('timeline');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -17,7 +21,7 @@
 
   function updateDownload() {
     const format = $('export-format').value;
-    $('download-current').href = selected[format];
+    $('download-current').href = assetUrl(selected[format]);
     $('download-current').download = `${selected.id}${format === 'compatibleGif' ? '-compatible' : ''}.${format === 'video' ? 'mp4' : 'gif'}`;
     $('download-label').textContent = format === 'video' ? '下载 MP4' : '下载 GIF';
     $('download-size').textContent = mb(format === 'compatibleGif' ? selected.compatibleSize : selected.sizes[format === 'video' ? 'mp4' : 'gif']);
@@ -26,7 +30,7 @@
   function loadGif() {
     // GIF preview and GIF download use the same selected variant.
     const path = $('export-format').value === 'compatibleGif' ? selected.compatibleGif : selected.gif;
-    gif.src = `${path}?replay=${++token}`;
+    gif.src = `${assetUrl(path)}&replay=${++token}`;
     gif.alt = `${selected.name} GIF ${$('export-format').value === 'compatibleGif' ? '50 fps 兼容版' : '近似 60 fps'}预览`;
   }
   function syncPlayback() {
@@ -57,7 +61,7 @@
     document.querySelectorAll('.style-card').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === style.id)));
     $('player-error').hidden = true;
     video.pause();
-    video.src = style.video;
+    video.src = assetUrl(style.video);
     video.setAttribute('aria-label', `${style.name} 60 fps 动画预览`);
     video.load();
     timeline.max = style.duration;
@@ -96,7 +100,7 @@
     button.dataset.id = style.id;
     button.setAttribute('aria-pressed', 'false');
     button.setAttribute('aria-label', `${style.number} ${style.name}，${style.duration} 秒`);
-    button.innerHTML = `<div class="card-image"><img src="${style.poster}" alt="" loading="lazy"/><span class="selected-mark">NOW PLAYING</span><span class="card-play"><svg><use href="#i-play"/></svg></span></div><div class="card-meta"><span class="card-number">${style.number}</span><span><span class="card-title">${style.name}</span><span class="card-subtitle">${style.en.toUpperCase()}</span></span></div>`;
+    button.innerHTML = `<div class="card-image"><img src="${assetUrl(style.poster)}" alt="" loading="lazy"/><span class="selected-mark">NOW PLAYING</span><span class="card-play"><svg><use href="#i-play"/></svg></span></div><div class="card-meta"><span class="card-number">${style.number}</span><span><span class="card-title">${style.name}</span><span class="card-subtitle">${style.en.toUpperCase()}</span></span></div>`;
     button.addEventListener('click', () => selectStyle(style));
     $('style-grid').append(button);
   }

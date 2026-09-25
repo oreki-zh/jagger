@@ -31,6 +31,7 @@ await page.locator('[data-id="ribbon"]').click();
 await page.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);
 await page.locator('#main-video').evaluate(v => { v.pause(); v.currentTime = 2.3; });
 await page.waitForFunction(() => !document.querySelector('#main-video').seeking);
+await page.evaluate(() => scrollTo(0, 0));
 await page.screenshot({ path: 'tests/artifacts/desktop.png', fullPage: true });
 
 await page.locator('#speed').selectOption('0.5');

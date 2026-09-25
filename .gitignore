@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.venv/
+__pycache__/
+tests/artifacts/
+output/
+gif-example.GIF
+logo-usedforgeneration.png

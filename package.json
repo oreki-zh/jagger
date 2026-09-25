@@ -1,0 +1,9 @@
+{
+  "name": "animation-display",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node server.mjs", "dev": "node server.mjs", "test:browser": "node tests/browser-check.mjs" },
+  "engines": { "node": ">=20" },
+  "devDependencies": { "playwright": "1.62.1", "sharp": "0.35.4" }
+}

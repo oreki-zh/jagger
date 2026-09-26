@@ -16,7 +16,7 @@ await page.waitForFunction(() => document.querySelector('#main-video').readyStat
 assert.equal(await page.locator('.style-card').count(), 9);
 const assets = await page.evaluate(() => window.MOTION_COLLECTION.styles.flatMap(s => [s.video, s.gif, s.compatibleGif, s.poster]));
 const source = await page.evaluate(() => ({ version: window.MOTION_COLLECTION.assetVersion, sha: window.MOTION_COLLECTION.sha256 }));
-assert.equal(source.version, source.sha.slice(0, 12));
+assert.equal(source.version, `${source.sha.slice(0, 12)}-smooth-v2`);
 const svgResponse = await page.request.get(new URL(`assets/logo.svg?v=${source.version}`, baseURL).href);
 assert.equal(createHash('sha256').update(await svgResponse.body()).digest('hex'), source.sha, 'Downloaded SVG matches the rendered source');
 for (const asset of assets) {
@@ -56,10 +56,13 @@ assert.equal(await page.locator('#main-video').evaluate(v => v.paused), true);
 await page.getByRole('button', { name: 'GIF 实际效果', exact: true }).click();
 await page.waitForFunction(() => document.querySelector('#gif-preview').naturalWidth === 1080);
 assert.equal(await page.locator('#video-controls').isVisible(), false);
-await page.locator('#export-format').selectOption('compatibleGif');
-assert.match(await page.locator('#gif-preview').getAttribute('src'), /compatible.gif/);
-assert.match(await page.locator('#download-current').getAttribute('href'), /compatible.gif/);
-for (const format of ['gif', 'compatibleGif', 'video']) {
+assert.match(await page.locator('#gif-preview').getAttribute('src'), /ribbon\.gif\?v=.*smooth-v2$/);
+const firstGif = await page.locator('#gif-preview').getAttribute('src');
+await page.locator('#export-format').selectOption('video');
+assert.equal(await page.locator('#gif-preview').getAttribute('src'), firstGif, 'Changing download format does not reload the GIF');
+await page.locator('#gif-replay').click();
+assert.notEqual(await page.locator('#gif-preview').getAttribute('src'), firstGif);
+for (const format of ['gif', 'video']) {
   await page.locator('#export-format').selectOption(format);
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('#download-current').click()]);
   await download.saveAs(`tests/artifacts/${download.suggestedFilename()}`);
@@ -82,6 +85,52 @@ await reduced.goto(`${baseURL.replace(/\/$/, '')}/#orbit`);
 await reduced.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);
 assert.equal(await reduced.locator('#main-video').evaluate(v => v.paused), true);
 assert.equal(await reduced.locator('#style-name').textContent(), '圆心扩展');
+// Regression: reduced-motion users can explicitly play from the beginning and
+// switch every style without loadedmetadata forcing a pause at 2.20 seconds.
+await reduced.locator('#play-toggle').click();
+await reduced.waitForFunction(() => {
+  const v = document.querySelector('#main-video');
+  return !v.paused && v.currentTime > 0 && v.currentTime < 1;
+});
+for (const id of ['ribbon', 'pages', 'cascade', 'orbit', 'slices', 'ink', 'mosaic', 'shutter', 'focus']) {
+  await reduced.locator(`[data-id="${id}"]`).click();
+  await reduced.waitForFunction(id => {
+    const v = document.querySelector('#main-video');
+    return v.currentSrc.includes(`/${id}.mp4`) && !v.paused && v.currentTime > 2.4;
+  }, id);
+}
+// A full loop must continue, even though the logo intentionally holds still mid-clip.
+await reduced.waitForFunction(() => document.querySelector('#main-video').currentTime > 4);
+await reduced.waitForFunction(() => {
+  const v = document.querySelector('#main-video');
+  return !v.paused && v.currentTime > .1 && v.currentTime < 1;
+});
+await reduced.getByRole('button', { name: 'GIF 实际效果', exact: true }).click();
+await reduced.getByRole('button', { name: '视频 60 FPS', exact: true }).click();
+await reduced.waitForFunction(() => !document.querySelector('#main-video').paused);
+await reduced.locator('#replay').click();
+await reduced.waitForFunction(() => {
+  const v = document.querySelector('#main-video');
+  return !v.paused && v.currentTime < 1;
+});
+await reduced.getByRole('button', { name: '暂停', exact: true }).click();
+assert.equal(await reduced.locator('#main-video').evaluate(v => v.paused), true);
+// Explicit play before delayed metadata arrives must also override initial still mode.
+const slow = await browser.newPage({ reducedMotion: 'reduce' });
+await slow.route('**/*.mp4?*', async route => {
+  await new Promise(resolve => setTimeout(resolve, 800));
+  await route.continue();
+});
+await slow.goto(baseURL, { waitUntil: 'domcontentloaded' });
+await slow.locator('#play-toggle').click();
+await slow.waitForFunction(() => {
+  const v = document.querySelector('#main-video');
+  return !v.paused && v.currentTime > .1 && v.currentTime < 1;
+});
+await slow.waitForFunction(() => {
+  const v = document.querySelector('#main-video');
+  return !v.paused && v.currentTime > 2.4;
+});
 assert.deepEqual(errors, []);
-console.log('Passed: nine styles, metadata, playback, seek, speed, loop, GIF variants, all downloads, mobile layout, keyboard selection, reduced motion, no page/network errors.');
+console.log('Passed: nine styles, metadata, playback, seek, speed, loop, 50 fps GIF, all downloads, mobile layout, keyboard selection, reduced-motion explicit playback past 2.20 s, full loop, delayed metadata, no page/network errors.');
 await browser.close();

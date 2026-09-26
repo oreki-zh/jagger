@@ -1,11 +1,10 @@
 """Logo motion collection, rendered from the supplied SVG with slack-gif-creator.
 
-60 fps masters contain 270 frames / 4.5 seconds. GIF export uses cumulative
-centisecond rounding (20/10/20 ms) instead of truncating every 16.67 ms frame.
-A separately sampled 50 fps GIF is included for browser timing compatibility.
+60 fps masters contain 270 frames / 4.5 seconds. GIFs are rendered directly at
+50 fps with 20 ms delays to avoid browser clamping of shorter frame delays.
 """
 from pathlib import Path
-import os, sys, json, math, subprocess, hashlib, zipfile, gc, argparse, xml.etree.ElementTree as ET
+import os, sys, json, math, subprocess, hashlib, zipfile, gc, argparse, shutil, xml.etree.ElementTree as ET
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
@@ -18,7 +17,8 @@ from core.easing import interpolate, ease_out_cubic, ease_back_out, ease_in_out_
 
 OUT = ROOT/'site/media'
 OUT.mkdir(parents=True, exist_ok=True)
-FPS, SECONDS, S = 60, 4.5, 2
+FPS, GIF_FPS, SECONDS, S = 60, 50, 4.5, 2
+RENDER_VERSION = "smooth-v2"
 W, H = 1080, 320
 SIZE = (W*S, H*S)
 SOURCE = ROOT/'high-resolution-reference.svg'
@@ -220,7 +220,7 @@ def frame_at(style,t):
 
 def gif_save(frames,path,durations):
     # Reuse the skill's frame assembly and global colour optimization.
-    builder=GIFBuilder(W,H,FPS)
+    builder=GIFBuilder(W,H,GIF_FPS)
     for f in frames:builder.add_frame(f)
     optimized=builder.optimize_colors(num_colors=256,use_global_palette=True)
     # Keep one indexed palette on disk. The timing adapter is needed because
@@ -234,11 +234,12 @@ def gif_save(frames,path,durations):
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--styles',nargs='+',choices=list(RENDERERS),help='Render only these styles, preserving existing files for the others.')
+parser.add_argument("--gif-only",action="store_true",help="Regenerate GIFs while preserving videos and posters from the same SVG.")
 args=parser.parse_args()
-if args.styles:
+if args.styles or args.gif_only:
     previous=json.loads((ROOT/'site/manifest.json').read_text())
-    if previous.get('sha256')!=SOURCE_SHA:
-        raise ValueError('The source SVG changed. Render all styles to avoid mixing old and new artwork.')
+    if previous.get('sha256')!=SOURCE_SHA or (args.styles and previous.get('renderVersion')!=RENDER_VERSION):
+        raise ValueError('The source or GIF timing changed. Render all styles to avoid mixing versions.')
 manifest=[]
 for style in STYLES:
     key=style['id']
@@ -248,32 +249,38 @@ for style in STYLES:
         style.update(duration=SECONDS,fps=FPS,width=W,height=H,video=f'media/{key}.mp4',gif=f'media/{key}.gif',compatibleGif=f'media/{key}-compatible.gif',poster=f'media/{key}-poster.png',sizes={ext:(OUT/f'{key}.{ext}').stat().st_size for ext in ['mp4','gif']},compatibleSize=(OUT/f'{key}-compatible.gif').stat().st_size)
         manifest.append(style)
         continue
-    print(f'Rendering {key}: 270 frames at 60 fps',flush=True)
-    frames=[frame_at(key,i/FPS) for i in range(round(FPS*SECONDS))]
-    frames[round(style['posterTime']*FPS)].save(OUT/f'{key}-poster.png')
-    proc=subprocess.Popen(['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{W}x{H}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-crf','16','-pix_fmt','yuv420p','-movflags','+faststart',str(OUT/f'{key}.mp4')],stdin=subprocess.PIPE)
-    for f in frames:proc.stdin.write(f.tobytes())
-    proc.stdin.close();assert proc.wait()==0
-    delays=[round((i+1)*100/FPS)*10-round(i*100/FPS)*10 for i in range(len(frames))]
-    gif_save(frames,OUT/f'{key}.gif',delays)
-    compatible=[frames[round(i*FPS/50)] for i in range(round(SECONDS*50))]
-    gif_save(compatible,OUT/f'{key}-compatible.gif',[20]*len(compatible))
+    print(f'Rendering {key}: 60 fps video / 50 fps GIF',flush=True)
+    if args.gif_only:
+        for suffix in ['.mp4','-poster.png']:
+            if not (OUT/f'{key}{suffix}').is_file():raise FileNotFoundError(f'{key}{suffix}')
+    else:
+        frames=[frame_at(key,i/FPS) for i in range(round(FPS*SECONDS))]
+        frames[round(style['posterTime']*FPS)].save(OUT/f'{key}-poster.png')
+        proc=subprocess.Popen(['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{W}x{H}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-crf','16','-pix_fmt','yuv420p','-movflags','+faststart',str(OUT/f'{key}.mp4')],stdin=subprocess.PIPE)
+        for f in frames:proc.stdin.write(f.tobytes())
+        proc.stdin.close();assert proc.wait()==0
+        del frames
+    # Render at exact 20 ms intervals; resampling 60 fps introduces uneven motion steps.
+    gif_frames=[frame_at(key,i/GIF_FPS) for i in range(round(GIF_FPS*SECONDS))]
+    gif_save(gif_frames,OUT/f'{key}.gif',[20]*len(gif_frames))
+    # Preserve old direct download URLs with the same corrected animation.
+    shutil.copyfile(OUT/f'{key}.gif',OUT/f'{key}-compatible.gif')
     style.update(duration=SECONDS,fps=FPS,width=W,height=H,
         video=f'media/{key}.mp4',gif=f'media/{key}.gif',compatibleGif=f'media/{key}-compatible.gif',poster=f'media/{key}-poster.png',
         sizes={ext:(OUT/f'{key}.{ext}').stat().st_size for ext in ['mp4','gif']},compatibleSize=(OUT/f'{key}-compatible.gif').stat().st_size)
     manifest.append(style)
     print(f'Finished {key}',flush=True)
-    del frames,compatible;gc.collect()
+    del gif_frames;gc.collect()
 
 STATIC.resize((W,H),Image.Resampling.LANCZOS).save(OUT/'still.png')
 (OUT/'source.png').unlink()
-metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12],duration=SECONDS,masterFps=FPS,gifTiming='Alternating 10/20 ms, nominal average 60 fps; browser delays may vary.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',styles=manifest)
+metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12]+"-"+RENDER_VERSION,renderVersion=RENDER_VERSION,duration=SECONDS,masterFps=FPS,gifFps=GIF_FPS,gifTiming='50 fps, 20 ms frame delays; identical hold frames may be merged.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',styles=manifest)
 (ROOT/'site/assets/logo.svg').write_bytes(SOURCE.read_bytes())
 (ROOT/'site/manifest.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2))
 (ROOT/'site/manifest.js').write_text('window.MOTION_COLLECTION = '+json.dumps(metadata,ensure_ascii=False)+';\n')
 with zipfile.ZipFile(OUT/'motion-collection.zip','w',zipfile.ZIP_DEFLATED) as archive:
     for f in OUT.iterdir():
-        if f.suffix in ['.gif','.mp4']:archive.write(f,f.name)
+        if f.suffix in ['.gif','.mp4'] and not f.name.endswith('-compatible.gif'):archive.write(f,f.name)
     archive.write(SOURCE,'logo.svg')
-    archive.writestr('README.txt',f'{len(manifest)} logo animations. Each is 4.5 seconds. MP4: exact 60 fps. GIF: 10/20 ms alternating delays, nominal 60 fps; playback depends on the viewer. *-compatible.gif: stable 50 fps timing. Original SVG included.\n')
+    archive.writestr('README.txt',f'{len(manifest)} logo animations. Each is 4.5 seconds. MP4: exact 60 fps. GIF: 50 fps, 20 ms frame delays, rendered directly from the SVG. Original SVG included.\n')
 print('Collection complete',flush=True)

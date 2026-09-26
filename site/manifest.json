@@ -1,10 +1,12 @@
 {
   "source": "high-resolution-reference.svg",
   "sha256": "f8c8d4a13b799d50d2c885f4a4296d139085e2a876ac0553d58513db3d68021c",
-  "assetVersion": "f8c8d4a13b79",
+  "assetVersion": "f8c8d4a13b79-smooth-v2",
+  "renderVersion": "smooth-v2",
   "duration": 4.5,
   "masterFps": 60,
-  "gifTiming": "Alternating 10/20 ms, nominal average 60 fps; browser delays may vary.",
+  "gifFps": 50,
+  "gifTiming": "50 fps, 20 ms frame delays; identical hold frames may be merged.",
   "compatibleGifFps": 50,
   "skill": "anthropics/skills/slack-gif-creator",
   "styles": [
@@ -27,9 +29,9 @@
       "poster": "media/ribbon-poster.png",
       "sizes": {
         "mp4": 264903,
-        "gif": 1165511
+        "gif": 979016
       },
-      "compatibleSize": 990786
+      "compatibleSize": 979016
     },
     {
       "id": "pages",
@@ -50,9 +52,9 @@
       "poster": "media/pages-poster.png",
       "sizes": {
         "mp4": 157535,
-        "gif": 760465
+        "gif": 646120
       },
-      "compatibleSize": 655822
+      "compatibleSize": 646120
     },
     {
       "id": "cascade",
@@ -73,9 +75,9 @@
       "poster": "media/cascade-poster.png",
       "sizes": {
         "mp4": 124636,
-        "gif": 897718
+        "gif": 768709
       },
-      "compatibleSize": 766623
+      "compatibleSize": 768709
     },
     {
       "id": "orbit",
@@ -96,9 +98,9 @@
       "poster": "media/orbit-poster.png",
       "sizes": {
         "mp4": 71268,
-        "gif": 563397
+        "gif": 466924
       },
-      "compatibleSize": 474802
+      "compatibleSize": 466924
     },
     {
       "id": "slices",
@@ -119,9 +121,9 @@
       "poster": "media/slices-poster.png",
       "sizes": {
         "mp4": 442887,
-        "gif": 1406957
+        "gif": 1183663
       },
-      "compatibleSize": 1186284
+      "compatibleSize": 1183663
     },
     {
       "id": "ink",
@@ -142,9 +144,9 @@
       "poster": "media/ink-poster.png",
       "sizes": {
         "mp4": 184443,
-        "gif": 1096492
+        "gif": 941803
       },
-      "compatibleSize": 932114
+      "compatibleSize": 941803
     },
     {
       "id": "mosaic",
@@ -165,9 +167,9 @@
       "poster": "media/mosaic-poster.png",
       "sizes": {
         "mp4": 529429,
-        "gif": 1845138
+        "gif": 1576887
       },
-      "compatibleSize": 1565068
+      "compatibleSize": 1576887
     },
     {
       "id": "shutter",
@@ -188,9 +190,9 @@
       "poster": "media/shutter-poster.png",
       "sizes": {
         "mp4": 67701,
-        "gif": 244096
+        "gif": 210447
       },
-      "compatibleSize": 210772
+      "compatibleSize": 210447
     },
     {
       "id": "focus",
@@ -211,9 +213,9 @@
       "poster": "media/focus-poster.png",
       "sizes": {
         "mp4": 238125,
-        "gif": 3330368
+        "gif": 2812872
       },
-      "compatibleSize": 2786506
+      "compatibleSize": 2812872
     }
   ]
 }

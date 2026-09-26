@@ -8,8 +8,8 @@
   <title>Animation Display — 中国财富出版社</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
-  <script src="manifest.js?v=hd-reference-20260925" defer></script>
-  <script src="app.js?v=hd-reference-20260925" defer></script>
+  <script src="manifest.js?v=smooth-playback-v2" defer></script>
+  <script src="app.js?v=smooth-playback-v2" defer></script>
 </head>
 <body>
   <svg class="svg-defs" aria-hidden="true"><defs>
@@ -52,7 +52,7 @@
           <label class="loop-toggle"><input type="checkbox" id="loop" checked /><span>循环</span></label>
           <button class="icon-button fullscreen" id="fullscreen" aria-label="全屏播放"><svg><use href="#i-expand"/></svg></button>
         </div>
-        <div class="gif-controls" id="gif-controls" hidden><span>GIF 为自动循环预览，播放速度取决于浏览器。</span><button id="gif-replay" class="text-link"><svg><use href="#i-replay"/></svg>重新播放</button></div>
+        <div class="gif-controls" id="gif-controls" hidden><span>GIF · 50 fps · 4.5 秒循环</span><button id="gif-replay" class="text-link"><svg><use href="#i-replay"/></svg>重新播放</button></div>
       </div>
 
       <aside class="detail-panel" aria-label="当前风格详情">
@@ -63,9 +63,9 @@
         <dl class="specs"><div><dt>时长</dt><dd>4.5 秒</dd></div><div><dt>视频帧率</dt><dd>60 fps</dd></div><div><dt>画布</dt><dd>1080 × 320</dd></div></dl>
         <div class="export-area">
           <label for="export-format">下载格式</label>
-          <select id="export-format"><option value="gif">GIF · 近似 60 fps</option><option value="compatibleGif">GIF · 50 fps 兼容版</option><option value="video">MP4 · 精确 60 fps</option></select>
+          <select id="export-format"><option value="gif">GIF · 50 fps</option><option value="video">MP4 · 精确 60 fps</option></select>
           <a class="download-button" id="download-current" href="media/ribbon.gif" download><span><svg><use href="#i-download"/></svg><b id="download-label">下载 GIF</b></span><small id="download-size"></small></a>
-          <details class="format-note"><summary>关于 GIF 的播放帧率</summary><p>视频以精确 60 fps 渲染。GIF 用 10 / 20 毫秒交替延迟近似 60 fps，总时长编码为 4.5 秒；部分浏览器会延长短帧。若 GIF 播放偏慢，请选 50 fps 兼容版。</p></details>
+          <details class="format-note"><summary>关于 GIF 的播放帧率</summary><p>GIF 使用稳定的 50 fps，视频为 60 fps，两者均为 4.5 秒。在线预览优先使用视频；需要图片格式时下载 GIF。</p></details>
         </div>
       </aside>
     </section>

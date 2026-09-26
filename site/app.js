@@ -16,22 +16,23 @@
   const gif = $('gif-preview');
   const timeline = $('timeline');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let selected = styles[0], mode = 'video', token = 0, wasPlaying = false;
+  let selected = styles[0], mode = 'video', token = 0;
+  let initialStill = false, resumeAfterScrub = false, resumeAfterVisibility = false;
   const mb = bytes => bytes >= 1024 * 1024 ? `${(bytes / 1048576).toFixed(2)} MB` : `${Math.round(bytes / 1024)} KB`;
 
   function updateDownload() {
     const format = $('export-format').value;
     $('download-current').href = assetUrl(selected[format]);
-    $('download-current').download = `${selected.id}${format === 'compatibleGif' ? '-compatible' : ''}.${format === 'video' ? 'mp4' : 'gif'}`;
+    $('download-current').download = `${selected.id}.${format === 'video' ? 'mp4' : 'gif'}`;
     $('download-label').textContent = format === 'video' ? '下载 MP4' : '下载 GIF';
-    $('download-size').textContent = mb(format === 'compatibleGif' ? selected.compatibleSize : selected.sizes[format === 'video' ? 'mp4' : 'gif']);
+    $('download-size').textContent = mb(selected.sizes[format === 'video' ? 'mp4' : 'gif']);
     if (mode === 'gif') loadGif();
   }
-  function loadGif() {
-    // GIF preview and GIF download use the same selected variant.
-    const path = $('export-format').value === 'compatibleGif' ? selected.compatibleGif : selected.gif;
-    gif.src = `${assetUrl(path)}&replay=${++token}`;
-    gif.alt = `${selected.name} GIF ${$('export-format').value === 'compatibleGif' ? '50 fps 兼容版' : '近似 60 fps'}预览`;
+  function loadGif(restart = false) {
+    // Reuse cached assets when selecting styles; only an explicit replay needs a fresh URL.
+    const src = `${assetUrl(selected.gif)}${restart ? `&replay=${++token}` : ''}`;
+    if (gif.getAttribute('src') !== src) gif.src = src;
+    gif.alt = `${selected.name} GIF 50 fps 预览`;
   }
   function syncPlayback() {
     const isPlaying = !video.paused && !video.ended;
@@ -45,6 +46,8 @@
     timeline.setAttribute('aria-valuetext', `${t.toFixed(2)} 秒，共 ${selected.duration.toFixed(2)} 秒`);
   }
   async function play() {
+    // Reduced motion controls initial autoplay, never an explicit playback request.
+    if (initialStill) { initialStill = false; video.currentTime = 0; }
     try { await video.play(); } catch (error) {
       if (!['AbortError', 'NotAllowedError'].includes(error.name)) $('player-error').hidden = false;
     }
@@ -52,6 +55,8 @@
   }
   function selectStyle(style, announce = true) {
     selected = style;
+    initialStill = !announce && reducedMotion;
+    resumeAfterScrub = resumeAfterVisibility = false;
     $('style-name').textContent = style.name;
     $('style-en').textContent = style.en.toUpperCase();
     $('style-number').textContent = `${style.number} / ${total}`;
@@ -71,7 +76,7 @@
     const url = new URL(location.href);
     url.hash = style.id;
     history.replaceState(null, '', url);
-    if (mode === 'video' && !reducedMotion) play();
+    if (mode === 'video' && !initialStill) play();
     if (announce) $('announcement').textContent = `已切换到${style.name}，时长 ${style.duration} 秒。`;
   }
   function setMode(next) {
@@ -87,7 +92,7 @@
     });
     if (isVideo) {
       gif.removeAttribute('src');
-      if (!reducedMotion) play();
+      play();
     } else {
       video.pause();
       loadGif();
@@ -115,13 +120,13 @@
   document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
   $('play-toggle').addEventListener('click', () => video.paused ? play() : video.pause());
   $('replay').addEventListener('click', () => { video.currentTime = 0; play(); });
-  $('gif-replay').addEventListener('click', loadGif);
+  $('gif-replay').addEventListener('click', () => loadGif(true));
   $('export-format').addEventListener('change', updateDownload);
   $('speed').addEventListener('change', () => { video.playbackRate = Number($('speed').value); });
   $('loop').addEventListener('change', () => { video.loop = $('loop').checked; });
-  timeline.addEventListener('pointerdown', () => { wasPlaying = !video.paused; video.pause(); });
-  timeline.addEventListener('input', () => { video.currentTime = Number(timeline.value); syncTime(); });
-  timeline.addEventListener('change', () => { if (wasPlaying) play(); wasPlaying = false; });
+  timeline.addEventListener('pointerdown', () => { resumeAfterScrub = !video.paused; video.pause(); });
+  timeline.addEventListener('input', () => { initialStill = false; video.currentTime = Number(timeline.value); syncTime(); });
+  timeline.addEventListener('change', () => { if (resumeAfterScrub) play(); resumeAfterScrub = false; });
   $('fullscreen').addEventListener('click', async () => {
     try {
       if (video.requestFullscreen) await video.requestFullscreen();
@@ -134,7 +139,7 @@
   video.addEventListener('error', () => { $('player-error').hidden = false; });
   video.addEventListener('loadedmetadata', () => {
     video.playbackRate = Number($('speed').value);
-    if (reducedMotion) { video.currentTime = 2.2; video.pause(); }
+    if (initialStill) { video.currentTime = 2.2; video.pause(); }
     syncTime();
   });
   gif.addEventListener('error', () => { if (mode === 'gif') $('player-error').hidden = false; });
@@ -143,8 +148,8 @@
     if (style && style !== selected) selectStyle(style);
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { wasPlaying = !video.paused; video.pause(); }
-    else if (wasPlaying && mode === 'video' && !reducedMotion) { play(); wasPlaying = false; }
+    if (document.hidden) { resumeAfterVisibility = !video.paused; video.pause(); }
+    else if (resumeAfterVisibility && mode === 'video') { resumeAfterVisibility = false; play(); }
   });
   selectStyle(styles.find(s => s.id === location.hash.slice(1)) || styles[0], false);
 })();

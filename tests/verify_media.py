@@ -8,7 +8,8 @@ data=json.loads((ROOT/'site/manifest.json').read_text())
 assert len(data['styles'])==9
 assert data['sha256']==hashlib.sha256((ROOT/data['source']).read_bytes()).hexdigest()
 assert (ROOT/'site/assets/logo.svg').read_bytes()==(ROOT/data['source']).read_bytes()
-assert data['assetVersion']==data['sha256'][:12]
+assert data['assetVersion']==data['sha256'][:12]+'-'+data['renderVersion']
+assert data['gifFps']==50
 expected=set()
 for style in data['styles']:
     info=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=r_frame_rate,nb_frames,duration,width,height','-of','json',str(ROOT/'site'/style['video'])]))['streams'][0]
@@ -24,8 +25,8 @@ for style in data['styles']:
         assert gif.info['loop']==0
         assert ImageChops.difference(first,gif.convert('RGB')).getbbox() is None
         assert gif.size==(1080,320)
-        if kind=='compatibleGif':assert all(d>=20 and d%20==0 for d in delays)
-        expected.add(path.name)
+        assert all(d>=20 and d%20==0 for d in delays), (path, min(delays))
+        if kind=='gif':expected.add(path.name)
     for ext in ['mp4','gif']:
         assert style['sizes'][ext]==(ROOT/'site/media'/f'{style["id"]}.{ext}').stat().st_size
     assert style['compatibleSize']==(ROOT/'site'/style['compatibleGif']).stat().st_size
@@ -34,6 +35,6 @@ for style in data['styles']:
 with zipfile.ZipFile(ROOT/'site/media/motion-collection.zip') as archive:
     assert archive.testzip() is None
     assert expected.issubset(set(archive.namelist()))
-    assert len(expected)==27
+    assert len(expected)==18
     assert archive.read('logo.svg')==(ROOT/data['source']).read_bytes()
-print('Verified all 27 animated assets and archive integrity.')
+print('Verified all 18 current animated assets and nine legacy GIF aliases and archive integrity.')

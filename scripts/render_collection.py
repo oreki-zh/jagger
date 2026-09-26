@@ -45,6 +45,11 @@ STYLES = [
     dict(id='shutter', name='对开揭幕', en='Center opening', category='空间', description='两道倾斜的幕边从中轴向外打开，让标识在对称的节奏中完整亮相。', mood='仪式 · 对称 · 稳重', number='08', posterTime=.72),
     dict(id='focus', name='景深聚焦', en='Focus pull', category='镜头', description='标识从放大的柔焦中缓缓收拢，细节逐渐清晰，如同镜头完成一次精准对焦。', mood='柔和 · 电影 · 克制', number='09', posterTime=.40),
 ]
+for _style in STYLES:_style['series']='classic'
+SERIES=[
+    dict(id='classic',number='VOL. 01',name='经典选集',en='The first collection',credit=''),
+    dict(id='opus',number='VOL. 02',name='Claude Opus 5.5 选集',en='Designed by Claude Opus 5.5',credit='Claude Opus 5.5'),
+]
 
 def clamp(v): return max(0., min(1., v))
 def smooth(v):
@@ -212,6 +217,11 @@ def focus(t):
     return c.filter(ImageFilter.GaussianBlur(blur)) if blur>.02 else c
 
 RENDERERS=dict(ribbon=ribbon,pages=pages,cascade=cascade,orbit=orbit,slices=slices,ink=ink,mosaic=mosaic,shutter=shutter,focus=focus)
+# Volume 02 lives in its own module; it shares this file's canvas, source raster and timing.
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+import opus_styles
+STYLES+=opus_styles.STYLES
+RENDERERS.update(opus_styles.renderers(globals()))
 def frame_at(style,t):
     if t<.08 or t>=4.37:return Image.new('RGB',(W,H),'white')
     # Exact same still across styles, matching the original vector.
@@ -235,7 +245,19 @@ def gif_save(frames,path,durations):
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--styles',nargs='+',choices=list(RENDERERS),help='Render only these styles, preserving existing files for the others.')
 parser.add_argument("--gif-only",action="store_true",help="Regenerate GIFs while preserving videos and posters from the same SVG.")
+parser.add_argument("--contact",metavar="DIR",help="Write a contact sheet per selected style to DIR and exit without touching the site.")
 args=parser.parse_args()
+if args.contact:
+    Path(args.contact).mkdir(parents=True,exist_ok=True)
+    times=[.1,.3,.5,.7,.9,1.1,1.3,1.5,1.7,1.84,3.62,3.75,3.9,4.05,4.2,4.34]
+    for key in args.styles or list(RENDERERS):
+        sheet=Image.new('RGB',(W*2,H*len(times)//2),'white')
+        for j,tt in enumerate(times):
+            f=frame_at(key,tt);ImageDraw.Draw(f).text((8,6),f'{tt:.2f}s',fill=(120,120,120))
+            sheet.paste(f,((j%2)*W,(j//2)*H))
+        sheet.save(Path(args.contact)/f'{key}.jpg',quality=88)
+        print('contact',key,flush=True)
+    (OUT/'source.png').unlink();sys.exit()
 if args.styles or args.gif_only:
     previous=json.loads((ROOT/'site/manifest.json').read_text())
     if previous.get('sha256')!=SOURCE_SHA or (args.styles and previous.get('renderVersion')!=RENDER_VERSION):
@@ -274,7 +296,7 @@ for style in STYLES:
 
 STATIC.resize((W,H),Image.Resampling.LANCZOS).save(OUT/'still.png')
 (OUT/'source.png').unlink()
-metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12]+"-"+RENDER_VERSION,renderVersion=RENDER_VERSION,duration=SECONDS,masterFps=FPS,gifFps=GIF_FPS,gifTiming='50 fps, 20 ms frame delays; identical hold frames may be merged.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',styles=manifest)
+metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12]+"-"+RENDER_VERSION,renderVersion=RENDER_VERSION,duration=SECONDS,masterFps=FPS,gifFps=GIF_FPS,gifTiming='50 fps, 20 ms frame delays; identical hold frames may be merged.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',archiveVersion=SOURCE_SHA[:12]+'-'+RENDER_VERSION+f'-{len(manifest)}',series=SERIES,styles=manifest)
 (ROOT/'site/assets/logo.svg').write_bytes(SOURCE.read_bytes())
 (ROOT/'site/manifest.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2))
 (ROOT/'site/manifest.js').write_text('window.MOTION_COLLECTION = '+json.dumps(metadata,ensure_ascii=False)+';\n')

@@ -5,7 +5,8 @@ from PIL import Image, ImageChops
 
 ROOT=Path(__file__).resolve().parents[1]
 data=json.loads((ROOT/'site/manifest.json').read_text())
-assert len(data['styles'])==9
+assert len(data['styles'])==18
+assert [s['series'] for s in data['styles']]==['classic']*9+['opus']*9
 assert data['sha256']==hashlib.sha256((ROOT/data['source']).read_bytes()).hexdigest()
 assert (ROOT/'site/assets/logo.svg').read_bytes()==(ROOT/data['source']).read_bytes()
 assert data['assetVersion']==data['sha256'][:12]+'-'+data['renderVersion']
@@ -35,6 +36,6 @@ for style in data['styles']:
 with zipfile.ZipFile(ROOT/'site/media/motion-collection.zip') as archive:
     assert archive.testzip() is None
     assert expected.issubset(set(archive.namelist()))
-    assert len(expected)==18
+    assert len(expected)==36
     assert archive.read('logo.svg')==(ROOT/data['source']).read_bytes()
-print('Verified all 18 current animated assets and nine legacy GIF aliases and archive integrity.')
+print('Verified all 36 current animated assets, 18 GIF aliases and archive integrity.')

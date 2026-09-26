@@ -5,7 +5,8 @@
   const $ = id => document.getElementById(id);
   const styles = collection.styles;
   const assetUrl = path => `${path}?v=${encodeURIComponent(collection.assetVersion || collection.sha256.slice(0, 12))}`;
-  document.querySelector('.archive-link').href = assetUrl('media/motion-collection.zip');
+  const archiveUrl = `media/motion-collection.zip?v=${encodeURIComponent(collection.archiveVersion || collection.assetVersion)}`;
+  document.querySelectorAll('a[href^="media/motion-collection.zip"]').forEach(link => { link.href = archiveUrl; });
   document.querySelector('footer a[download]').href = assetUrl('assets/logo.svg');
   const total = String(styles.length).padStart(2, '0');
   $('edition-count').textContent = total;
@@ -63,6 +64,9 @@
     $('preview-index').textContent = style.number;
     $('style-description').textContent = style.description;
     $('style-mood').textContent = style.mood;
+    const series = seriesById[style.series];
+    $('style-credit').hidden = !series?.credit;
+    $('style-credit').textContent = series?.credit ? `由 ${series.credit} 设计` : '';
     document.querySelectorAll('.style-card').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === style.id)));
     $('player-error').hidden = true;
     video.pause();
@@ -99,13 +103,25 @@
     }
   }
 
+  const seriesById = Object.fromEntries((collection.series || []).map(s => [s.id, s]));
+  let currentSeries = null;
   for (const style of styles) {
+    const series = seriesById[style.series];
+    if (series && style.series !== currentSeries) {
+      currentSeries = style.series;
+      const count = styles.filter(s => s.series === style.series).length;
+      const heading = document.createElement('div');
+      heading.className = `series-heading series-${series.id}`;
+      heading.setAttribute('role', 'presentation');
+      heading.innerHTML = `<span class="series-number">${series.number}</span><span class="series-name">${series.name}</span><span class="series-en">${series.en.toUpperCase()}</span><span class="series-count">${String(count).padStart(2, '0')} 款</span>`;
+      $('style-grid').append(heading);
+    }
     const button = document.createElement('button');
     button.className = 'style-card';
     button.dataset.id = style.id;
     button.setAttribute('aria-pressed', 'false');
     button.setAttribute('aria-label', `${style.number} ${style.name}，${style.duration} 秒`);
-    button.innerHTML = `<div class="card-image"><img src="${assetUrl(style.poster)}" alt="" loading="lazy"/><span class="selected-mark">NOW PLAYING</span><span class="card-play"><svg><use href="#i-play"/></svg></span></div><div class="card-meta"><span class="card-number">${style.number}</span><span><span class="card-title">${style.name}</span><span class="card-subtitle">${style.en.toUpperCase()}</span></span></div>`;
+    button.innerHTML = `<div class="card-image"><img src="${assetUrl(style.poster)}" alt="" loading="lazy"/><span class="selected-mark">NOW PLAYING</span><span class="card-play"><svg><use href="#i-play"/></svg></span></div><div class="card-meta"><span class="card-number">${style.number}</span><span><span class="card-title">${style.name}</span><span class="card-subtitle">${style.en.toUpperCase()}</span></span>${series?.credit ? `<span class="card-badge">OPUS 5.5</span>` : ''}</div>`;
     button.addEventListener('click', () => selectStyle(style));
     $('style-grid').append(button);
   }
@@ -115,7 +131,7 @@
     const index = styles.indexOf(selected);
     const next = (index + (event.key === 'ArrowRight' ? 1 : -1) + styles.length) % styles.length;
     selectStyle(styles[next]);
-    $('style-grid').children[next].focus();
+    $('style-grid').querySelector(`[data-id="${styles[next].id}"]`).focus();
   });
   document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
   $('play-toggle').addEventListener('click', () => video.paused ? play() : video.pause());

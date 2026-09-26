@@ -13,7 +13,10 @@ await mkdir('tests/artifacts', { recursive: true });
 const baseURL = process.env.BASE_URL || 'http://localhost:4173/';
 await page.goto(baseURL, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);
-assert.equal(await page.locator('.style-card').count(), 9);
+assert.equal(await page.locator('.style-card').count(), 18);
+const styleIds = await page.evaluate(() => window.MOTION_COLLECTION.styles.map(s => s.id));
+assert.equal(await page.locator('.series-heading').count(), 2);
+assert.equal(await page.locator('.card-badge').count(), 9);
 const assets = await page.evaluate(() => window.MOTION_COLLECTION.styles.flatMap(s => [s.video, s.gif, s.compatibleGif, s.poster]));
 const source = await page.evaluate(() => ({ version: window.MOTION_COLLECTION.assetVersion, sha: window.MOTION_COLLECTION.sha256 }));
 assert.equal(source.version, `${source.sha.slice(0, 12)}-smooth-v2`);
@@ -23,7 +26,7 @@ for (const asset of assets) {
   const response = await page.request.head(new URL(`${asset}?v=${source.version}`, baseURL).href);
   assert.equal(response.status(), 200, asset);
 }
-for (const id of ['ribbon', 'pages', 'cascade', 'orbit', 'slices', 'ink', 'mosaic', 'shutter', 'focus']) {
+for (const id of styleIds) {
   await page.locator(`[data-id="${id}"]`).click();
   await page.waitForFunction(id => {
     const v = document.querySelector('#main-video');
@@ -80,6 +83,10 @@ await page.locator('[data-id="pages"]').click();
 assert.equal(await page.locator('#style-name').textContent(), '书页翻转');
 await page.locator('[data-id="pages"]').press('ArrowRight');
 assert.equal(await page.locator('#style-name').textContent(), '逐字跃入');
+await page.locator('[data-id="focus"]').click();
+await page.locator('[data-id="focus"]').press('ArrowRight');
+assert.equal(await page.locator('#style-name').textContent(), '光束扫描');
+assert.equal(await page.locator('#style-credit').textContent(), '由 Claude Opus 5.5 设计');
 const reduced = await browser.newPage({ reducedMotion: 'reduce' });
 await reduced.goto(`${baseURL.replace(/\/$/, '')}/#orbit`);
 await reduced.waitForFunction(() => document.querySelector('#main-video').readyState >= 2);
@@ -92,7 +99,7 @@ await reduced.waitForFunction(() => {
   const v = document.querySelector('#main-video');
   return !v.paused && v.currentTime > 0 && v.currentTime < 1;
 });
-for (const id of ['ribbon', 'pages', 'cascade', 'orbit', 'slices', 'ink', 'mosaic', 'shutter', 'focus']) {
+for (const id of styleIds) {
   await reduced.locator(`[data-id="${id}"]`).click();
   await reduced.waitForFunction(id => {
     const v = document.querySelector('#main-video');
@@ -132,5 +139,5 @@ await slow.waitForFunction(() => {
   return !v.paused && v.currentTime > 2.4;
 });
 assert.deepEqual(errors, []);
-console.log('Passed: nine styles, metadata, playback, seek, speed, loop, 50 fps GIF, all downloads, mobile layout, keyboard selection, reduced-motion explicit playback past 2.20 s, full loop, delayed metadata, no page/network errors.');
+console.log('Passed: eighteen styles in two volumes, metadata, playback, seek, speed, loop, 50 fps GIF, all downloads, mobile layout, keyboard selection, reduced-motion explicit playback past 2.20 s, full loop, delayed metadata, no page/network errors.');
 await browser.close();

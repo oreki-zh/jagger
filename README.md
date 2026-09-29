@@ -8,6 +8,23 @@
 
 **VOL. 02 Claude Opus 5.5 选集**（编号 10–18，由 Claude Opus 5.5 设计并编写渲染代码，见 `scripts/opus_styles.py`）：光束扫描、波浪浮现、印章落定、逐字打印、粒子凝聚、百叶开合、水墨晕染、红线托起、立体旋入。
 
+## 标识大小导出
+
+网站右侧的“标识大小”可以把中间的标识缩小或放大（40%–120%），画布始终保持 1080 × 320，只改变四周白色留白：
+
+- 拖动滑块、点预设（80% / 90% / 原始 / 110%），或直接输入“左右留白”“上下留白”的像素值，另一项会自动联动（标识按原比例缩放，所以两项不能分别独立设置）。
+- 原始大小时左右留白 90 px、上下留白 106 px；预览里的红色虚线框表示标识的外框。
+- 大小不是 100% 时，下载按钮变为“导出 GIF/MP4 · N%”，文件在浏览器里重新生成并下载为 `风格-N.gif` / `风格-N.mp4`。GIF 保持 50 fps 与原有帧延迟；MP4 为 60 fps、270 帧，使用浏览器的 WebCodecs H.264 编码（最新版 Chrome、Edge、Safari 支持；不支持时会提示改用 GIF）。再次点击按钮可取消导出。
+- 缩放以画布中心为基准。放大超过 100% 时画面会略微变软，动效中超出画布的部分会被裁切。
+
+需要放大后仍然锐利的版本，可以用命令行直接从 SVG 重新渲染（输出到指定目录，不改动网站素材）：
+
+```sh
+GIF_SKILL_PATH=... SHARP_MODULE=... .venv/bin/python scripts/render_collection.py --export exports --logo-scale 1.1 --styles ribbon sweep
+```
+
+`site/exporter.js` 不依赖任何第三方库：包含 GIF 解码/编码（沿用原 GIF 的 256 色调色板）与单轨 MP4 封装。
+
 ## 本地预览
 
 ```sh
@@ -19,7 +36,8 @@ npm start
 ## 目录与 GitHub 部署
 
 - `site/`：完整静态网站，含 HTML、CSS、JavaScript 和全部可下载素材。
-- `site/manifest.json`：动画名称、媒体路径和真实文件大小。
+- `site/manifest.json`：动画名称、媒体路径、真实文件大小和标识外框（`logoBox`）。
+- `site/exporter.js`：浏览器端的标识大小导出工具。
 - `site/manifest.js`：相同数据供页面直接加载，支持普通静态托管。
 - `site/media/`：十八套 MP4、50 fps GIF、预览图和全部素材 ZIP；保留旧兼容 GIF 地址供已有链接使用。
 - `scripts/render_collection.py`：使用 Anthropic `slack-gif-creator` 的帧合成、缓动与调色板功能渲染动画。
@@ -67,7 +85,7 @@ npm run test:browser
 .venv/bin/python tests/verify_media.py
 ```
 
-可以通过 `BASE_URL=https://oreki-zh.github.io/jagger/ npm run test:browser` 验证已部署站点。测试包括十八种风格切换、两辑分组、全部素材地址、播放控制、实际下载、手机布局、键盘操作与减少动态效果设置下主动播放、所有风格播放越过 2.20 秒、完整循环和延迟加载。
+可以通过 `BASE_URL=https://oreki-zh.github.io/jagger/ npm run test:browser` 验证已部署站点。测试包括十八种风格切换、两辑分组、标识大小导出（GIF，以及浏览器支持时的 MP4）、全部素材地址、播放控制、实际下载、手机布局、键盘操作与减少动态效果设置下主动播放、所有风格播放越过 2.20 秒、完整循环和延迟加载。
 
 ## 设计参考
 

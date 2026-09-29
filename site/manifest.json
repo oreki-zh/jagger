@@ -459,5 +459,11 @@
       },
       "compatibleSize": 1804906
     }
-  ]
+  ],
+  "logoBox": {
+    "x": 90,
+    "y": 106,
+    "width": 900,
+    "height": 108
+  }
 }

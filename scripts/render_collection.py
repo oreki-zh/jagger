@@ -222,11 +222,21 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import opus_styles
 STYLES+=opus_styles.STYLES
 RENDERERS.update(opus_styles.renderers(globals()))
-def frame_at(style,t):
+def scale_canvas(frame,scale):
+    # Scale the 2x artwork about the canvas centre; the canvas itself never changes.
+    if abs(scale-1)<1e-6:return frame
+    w,h=round(W*S*scale),round(H*S*scale)
+    c=WHITE.copy();c.paste(frame.resize((w,h),Image.Resampling.LANCZOS),((W*S-w)//2,(H*S-h)//2))
+    return c
+def frame_at(style,t,scale=1.):
     if t<.08 or t>=4.37:return Image.new('RGB',(W,H),'white')
     # Exact same still across styles, matching the original vector.
-    if 1.85<=t<3.6:return STATIC.resize((W,H),Image.Resampling.LANCZOS)
-    return RENDERERS[style](t).resize((W,H),Image.Resampling.LANCZOS)
+    if 1.85<=t<3.6:return scale_canvas(STATIC,scale).resize((W,H),Image.Resampling.LANCZOS)
+    return scale_canvas(RENDERERS[style](t),scale).resize((W,H),Image.Resampling.LANCZOS)
+def write_mp4(frames,path):
+    proc=subprocess.Popen(['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{W}x{H}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-crf','16','-pix_fmt','yuv420p','-movflags','+faststart',str(path)],stdin=subprocess.PIPE)
+    for f in frames:proc.stdin.write(f.tobytes())
+    proc.stdin.close();assert proc.wait()==0
 
 def gif_save(frames,path,durations):
     # Reuse the skill's frame assembly and global colour optimization.
@@ -246,7 +256,19 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--styles',nargs='+',choices=list(RENDERERS),help='Render only these styles, preserving existing files for the others.')
 parser.add_argument("--gif-only",action="store_true",help="Regenerate GIFs while preserving videos and posters from the same SVG.")
 parser.add_argument("--contact",metavar="DIR",help="Write a contact sheet per selected style to DIR and exit without touching the site.")
+parser.add_argument("--export",metavar="DIR",help="Write MP4 + GIF for the selected styles to DIR at --logo-scale, without touching the site.")
+parser.add_argument("--logo-scale",type=float,default=1.,help="Logo size for --export, 0.4–1.2. The canvas stays 1080 × 320; margins change.")
 args=parser.parse_args()
+if not .4<=args.logo_scale<=1.2:parser.error('--logo-scale must be between 0.4 and 1.2')
+if args.export:
+    target=Path(args.export);target.mkdir(parents=True,exist_ok=True);pct=round(args.logo_scale*100)
+    print(f'Logo {pct}%: left/right margin {(W-LW/S*args.logo_scale)/2:.0f} px, top/bottom margin {(H-LH/S*args.logo_scale)/2:.0f} px',flush=True)
+    for key in args.styles or list(RENDERERS):
+        write_mp4([frame_at(key,i/FPS,args.logo_scale) for i in range(round(FPS*SECONDS))],target/f'{key}-{pct}.mp4')
+        frames=[frame_at(key,i/GIF_FPS,args.logo_scale) for i in range(round(GIF_FPS*SECONDS))]
+        gif_save(frames,target/f'{key}-{pct}.gif',[20]*len(frames))
+        print('exported',key,flush=True);del frames;gc.collect()
+    (OUT/'source.png').unlink();sys.exit()
 if args.contact:
     Path(args.contact).mkdir(parents=True,exist_ok=True)
     times=[.1,.3,.5,.7,.9,1.1,1.3,1.5,1.7,1.84,3.62,3.75,3.9,4.05,4.2,4.34]
@@ -278,9 +300,7 @@ for style in STYLES:
     else:
         frames=[frame_at(key,i/FPS) for i in range(round(FPS*SECONDS))]
         frames[round(style['posterTime']*FPS)].save(OUT/f'{key}-poster.png')
-        proc=subprocess.Popen(['ffmpeg','-y','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24','-s',f'{W}x{H}','-r',str(FPS),'-i','-','-an','-c:v','libx264','-crf','16','-pix_fmt','yuv420p','-movflags','+faststart',str(OUT/f'{key}.mp4')],stdin=subprocess.PIPE)
-        for f in frames:proc.stdin.write(f.tobytes())
-        proc.stdin.close();assert proc.wait()==0
+        write_mp4(frames,OUT/f'{key}.mp4')
         del frames
     # Render at exact 20 ms intervals; resampling 60 fps introduces uneven motion steps.
     gif_frames=[frame_at(key,i/GIF_FPS) for i in range(round(GIF_FPS*SECONDS))]
@@ -296,7 +316,7 @@ for style in STYLES:
 
 STATIC.resize((W,H),Image.Resampling.LANCZOS).save(OUT/'still.png')
 (OUT/'source.png').unlink()
-metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12]+"-"+RENDER_VERSION,renderVersion=RENDER_VERSION,duration=SECONDS,masterFps=FPS,gifFps=GIF_FPS,gifTiming='50 fps, 20 ms frame delays; identical hold frames may be merged.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',archiveVersion=SOURCE_SHA[:12]+'-'+RENDER_VERSION+f'-{len(manifest)}',series=SERIES,styles=manifest)
+metadata=dict(source=SOURCE.name,sha256=SOURCE_SHA,assetVersion=SOURCE_SHA[:12]+"-"+RENDER_VERSION,renderVersion=RENDER_VERSION,duration=SECONDS,masterFps=FPS,gifFps=GIF_FPS,gifTiming='50 fps, 20 ms frame delays; identical hold frames may be merged.',compatibleGifFps=50,skill='anthropics/skills/slack-gif-creator',archiveVersion=SOURCE_SHA[:12]+'-'+RENDER_VERSION+f'-{len(manifest)}',series=SERIES,styles=manifest,logoBox=dict(x=LX//S,y=LY//S,width=LW//S,height=LH//S))
 (ROOT/'site/assets/logo.svg').write_bytes(SOURCE.read_bytes())
 (ROOT/'site/manifest.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2))
 (ROOT/'site/manifest.js').write_text('window.MOTION_COLLECTION = '+json.dumps(metadata,ensure_ascii=False)+';\n')

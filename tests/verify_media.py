@@ -38,4 +38,16 @@ with zipfile.ZipFile(ROOT/'site/media/motion-collection.zip') as archive:
     assert expected.issubset(set(archive.namelist()))
     assert len(expected)==36
     assert archive.read('logo.svg')==(ROOT/data['source']).read_bytes()
+# Optional: files produced by the logo size exporter during the browser test.
+scaled=ROOT/'tests/artifacts/ribbon-90.gif'
+if scaled.is_file():
+    gif=Image.open(scaled);total=0
+    for i in range(gif.n_frames):gif.seek(i);total+=gif.info['duration']
+    assert gif.size==(1080,320) and total==4500 and gif.info['loop']==0,(gif.size,total)
+    print('Scaled GIF export: 1080 × 320, 4.5 s loop')
+scaled=ROOT/'tests/artifacts/ribbon-90.mp4'
+if scaled.is_file():
+    info=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=r_frame_rate,nb_frames,width,height','-of','json',str(scaled)]))['streams'][0]
+    assert (info['r_frame_rate'],info['nb_frames'],info['width'],info['height'])==('60/1','270',1080,320),info
+    print('Scaled MP4 export: 1080 × 320, 60 fps, 270 frames')
 print('Verified all 36 current animated assets, 18 GIF aliases and archive integrity.')

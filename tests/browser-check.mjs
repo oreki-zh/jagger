@@ -74,6 +74,29 @@ for (const format of ['gif', 'video']) {
 const [zip] = await Promise.all([page.waitForEvent('download'), page.locator('.archive-link').click()]);
 assert.equal(zip.suggestedFilename(), 'motion-collection.zip');
 assert.equal(await zip.failure(), null);
+// Logo size export: the canvas stays 1080 × 320 while margins follow the scale.
+assert.equal(await page.inputValue('#margin-x'), '90');
+assert.equal(await page.inputValue('#margin-y'), '106');
+await page.locator('#logo-scale').fill('80');
+assert.equal(await page.inputValue('#margin-x'), '180');
+assert.equal(await page.inputValue('#margin-y'), '117');
+assert.match(await page.locator('#main-video').getAttribute('style'), /scale\(0\.8\)/);
+await page.locator('#margin-x').fill('135');
+assert.equal(await page.locator('#scale-value').textContent(), '90%');
+await page.locator('#export-format').selectOption('gif');
+assert.equal(await page.locator('#download-label').textContent(), '导出 GIF · 90%');
+const [scaledGif] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.locator('#download-current').click()]);
+assert.equal(scaledGif.suggestedFilename(), 'ribbon-90.gif');
+await scaledGif.saveAs('tests/artifacts/ribbon-90.gif');
+const canEncodeMp4 = await page.evaluate(async () => 'VideoEncoder' in window && (await VideoEncoder.isConfigSupported({ codec: 'avc1.42e028', width: 1080, height: 320, framerate: 60, bitrate: 6e6, avc: { format: 'avc' } })).supported);
+if (canEncodeMp4) {
+  await page.locator('#export-format').selectOption('video');
+  const [scaledMp4] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.locator('#download-current').click()]);
+  assert.equal(scaledMp4.suggestedFilename(), 'ribbon-90.mp4');
+  await scaledMp4.saveAs('tests/artifacts/ribbon-90.mp4');
+} else console.warn('Skipped scaled MP4 export: this browser has no H.264 WebCodecs encoder.');
+await page.locator('[data-scale="100"]').click();
+assert.equal(await page.locator('#download-label').textContent(), canEncodeMp4 ? '下载 MP4' : '下载 GIF');
 await page.getByRole('button', { name: '视频 60 FPS', exact: true }).click();
 await page.locator('#main-video').evaluate(v => { v.pause(); v.currentTime = 2.3; });
 await page.setViewportSize({ width: 390, height: 844 });
@@ -139,5 +162,5 @@ await slow.waitForFunction(() => {
   return !v.paused && v.currentTime > 2.4;
 });
 assert.deepEqual(errors, []);
-console.log('Passed: eighteen styles in two volumes, metadata, playback, seek, speed, loop, 50 fps GIF, all downloads, mobile layout, keyboard selection, reduced-motion explicit playback past 2.20 s, full loop, delayed metadata, no page/network errors.');
+console.log('Passed: eighteen styles in two volumes, logo size export, metadata, playback, seek, speed, loop, 50 fps GIF, all downloads, mobile layout, keyboard selection, reduced-motion explicit playback past 2.20 s, full loop, delayed metadata, no page/network errors.');
 await browser.close();
